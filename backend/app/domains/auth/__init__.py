@@ -1,0 +1,1 @@
+"""Auth domain — OTP authentication and JWT token management."""
