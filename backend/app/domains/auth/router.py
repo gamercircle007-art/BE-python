@@ -5,6 +5,8 @@ Auth domain API routes — enterprise signup and login.
 |--------|--------------------------|------|------------------------------------|
 | POST   | /auth/signup/request-otp | No   | Send WhatsApp OTP for signup       |
 | POST   | /auth/signup/verify-otp  | No   | Verify OTP, set password, register |
+| POST   | /auth/login/request-otp  | No   | Send WhatsApp OTP for login        |
+| POST   | /auth/login/verify-otp   | No   | Verify OTP and receive JWT         |
 | POST   | /auth/login              | No   | Login with phone + password        |
 | POST   | /auth/refresh-token      | No   | Rotate refresh token               |
 | GET    | /auth/me                 | Yes  | Current user profile               |
@@ -22,6 +24,8 @@ from fastapi import APIRouter, status
 from app.core.dependencies import CurrentUserDep, DbSessionDep, RedisDep, SettingsDep
 from app.domains.auth.schemas import (
     LoginRequest,
+    LoginRequestOtpRequest,
+    LoginVerifyOtpRequest,
     LogoutRequest,
     MessageResponse,
     RefreshTokenRequest,
@@ -85,6 +89,41 @@ async def signup_verify_otp(
     settings: SettingsDep,
 ) -> TokenResponse:
     return await _auth_service(db, redis, settings).signup_verify_otp(body)
+
+
+@router.post(
+    "/login/request-otp",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Request login OTP via WhatsApp",
+    description=(
+        "Send a WhatsApp OTP to a registered phone number. "
+        "Rate limited to 5 requests per 10 minutes."
+    ),
+)
+async def login_request_otp(
+    body: LoginRequestOtpRequest,
+    db: DbSessionDep,
+    redis: RedisDep,
+    settings: SettingsDep,
+) -> MessageResponse:
+    return await _auth_service(db, redis, settings).login_request_otp(body)
+
+
+@router.post(
+    "/login/verify-otp",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Verify login OTP",
+    description="Verify the WhatsApp OTP and receive JWT access + refresh tokens.",
+)
+async def login_verify_otp(
+    body: LoginVerifyOtpRequest,
+    db: DbSessionDep,
+    redis: RedisDep,
+    settings: SettingsDep,
+) -> TokenResponse:
+    return await _auth_service(db, redis, settings).login_verify_otp(body)
 
 
 @router.post(

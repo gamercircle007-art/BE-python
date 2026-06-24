@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../features/auth/data/auth_repository.dart';
+import '../../features/auth/presentation/screens/login_otp_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/signup_verify_screen.dart';
@@ -29,18 +30,16 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: '/auth/login/otp',
+        builder: (context, state) => const LoginOtpScreen(),
+      ),
+      GoRoute(
         path: '/auth/signup',
         builder: (context, state) => const SignupScreen(),
       ),
       GoRoute(
         path: '/auth/signup/verify',
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>?;
-          return SignupVerifyScreen(
-            phoneNumber: extra?['phone'] as String? ?? '',
-            email: extra?['email'] as String?,
-          );
-        },
+        builder: (context, state) => const SignupVerifyScreen(),
       ),
       GoRoute(
         path: '/home',

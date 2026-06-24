@@ -39,6 +39,23 @@ class AuthRepository {
     return _saveTokensFromResponse(response.data as Map<String, dynamic>);
   }
 
+  Future<void> loginRequestOtp({required String phoneNumber}) async {
+    await _dio.post('/auth/login/request-otp', data: {
+      'phone_number': phoneNumber,
+    });
+  }
+
+  Future<UserModel> loginVerifyOtp({
+    required String phoneNumber,
+    required String otp,
+  }) async {
+    final response = await _dio.post('/auth/login/verify-otp', data: {
+      'phone_number': phoneNumber,
+      'otp': otp,
+    });
+    return _saveTokensFromResponse(response.data as Map<String, dynamic>);
+  }
+
   Future<UserModel> login({
     required String phoneNumber,
     required String password,

@@ -2,25 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../shared/widgets/loading_button.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../providers/auth_provider.dart';
+import '../providers/signup_session_provider.dart';
+import '../widgets/auth_input.dart';
+import '../widgets/gradient_button.dart';
+import '../widgets/gradient_header_widget.dart';
+import '../widgets/otp_input_widget.dart';
 
 class SignupVerifyScreen extends ConsumerStatefulWidget {
-  const SignupVerifyScreen({
-    super.key,
-    required this.phoneNumber,
-    this.email,
-  });
-
-  final String phoneNumber;
-  final String? email;
+  const SignupVerifyScreen({super.key});
 
   @override
   ConsumerState<SignupVerifyScreen> createState() => _SignupVerifyScreenState();
 }
 
 class _SignupVerifyScreenState extends ConsumerState<SignupVerifyScreen> {
-  final _otpController = TextEditingController();
+  String _otp = '';
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
@@ -28,19 +26,24 @@ class _SignupVerifyScreenState extends ConsumerState<SignupVerifyScreen> {
 
   @override
   void dispose() {
-    _otpController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    final otp = _otpController.text.trim();
+    final session = ref.read(signupSessionProvider);
+    final phone = session.phoneNumber;
     final password = _passwordController.text;
     final confirm = _confirmPasswordController.text;
 
-    if (otp.length < 4) {
-      _showError('Please enter the OTP code');
+    if (phone.isEmpty) {
+      _showError('Session expired. Please sign up again.');
+      context.go('/auth/signup');
+      return;
+    }
+    if (_otp.length < 4) {
+      _showError('Please enter the complete OTP');
       return;
     }
     if (password.length < 8) {
@@ -59,11 +62,12 @@ class _SignupVerifyScreenState extends ConsumerState<SignupVerifyScreen> {
     setState(() => _isLoading = true);
     try {
       await ref.read(authStateProvider.notifier).signupVerifyOtp(
-            phoneNumber: widget.phoneNumber,
-            otp: otp,
+            phoneNumber: phone,
+            otp: _otp,
             password: password,
           );
       if (!mounted) return;
+      ref.read(signupSessionProvider.notifier).clear();
       context.go('/home');
     } catch (e) {
       if (!mounted) return;
@@ -81,77 +85,110 @@ class _SignupVerifyScreenState extends ConsumerState<SignupVerifyScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final session = ref.watch(signupSessionProvider);
+    final phone = session.phoneNumber;
+
+    if (phone.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go('/auth/signup');
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Verify & Set Password')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Almost there!',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Enter the OTP sent to ${widget.phoneNumber} via WhatsApp '
-                'and choose a secure password.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      backgroundColor: Colors.white,
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const GradientHeaderWidget(height: 220),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Verify OTP',
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textDark,
                     ),
-              ),
-              const SizedBox(height: 32),
-              TextField(
-                controller: _otpController,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                maxLength: 6,
-                decoration: const InputDecoration(
-                  labelText: 'OTP Code',
-                  counterText: '',
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  helperText: 'Min 8 chars, uppercase, lowercase, digit',
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                    ),
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Enter the code sent to $phone via WhatsApp and set your password.',
+                    style: const TextStyle(fontSize: 14, color: AppColors.textMuted),
+                  ),
+                  const SizedBox(height: 32),
+                  OtpInputWidget(
+                    onChanged: (otp) => setState(() => _otp = otp),
+                    onCompleted: (otp) => setState(() => _otp = otp),
+                  ),
+                  const SizedBox(height: 24),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    decoration: authInputDecoration(
+                      hint: 'Password',
+                      icon: Icons.lock_outline,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: AppColors.textMuted,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: _obscurePassword,
+                    decoration: authInputDecoration(
+                      hint: 'Confirm Password',
+                      icon: Icons.lock_outline,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Min 8 chars with uppercase, lowercase, and a digit',
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  ),
+                  const SizedBox(height: 28),
+                  GradientButton(
+                    label: 'Create Account',
+                    isLoading: _isLoading,
+                    onPressed: _isLoading ? null : _submit,
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.pop(),
+                      child: const Text(
+                        'Back',
+                        style: TextStyle(color: AppColors.textMuted),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _confirmPasswordController,
-                obscureText: _obscurePassword,
-                decoration: const InputDecoration(labelText: 'Confirm password'),
-              ),
-              const SizedBox(height: 32),
-              LoadingButton(
-                label: 'Create Account',
-                isLoading: _isLoading,
-                onPressed: _submit,
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => context.pop(),
-                child: const Text('Back'),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

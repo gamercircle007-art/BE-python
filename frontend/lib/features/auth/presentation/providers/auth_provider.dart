@@ -15,15 +15,11 @@ class AuthState extends _$AuthState {
     required String email,
     required String phoneNumber,
   }) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      await ref.read(authRepositoryProvider).signupRequestOtp(
-            name: name,
-            email: email,
-            phoneNumber: phoneNumber,
-          );
-      return state.value;
-    });
+    await ref.read(authRepositoryProvider).signupRequestOtp(
+          name: name,
+          email: email,
+          phoneNumber: phoneNumber,
+        );
   }
 
   Future<UserModel?> signupVerifyOtp({
@@ -40,6 +36,29 @@ class AuthState extends _$AuthState {
           );
       return user;
     });
+    if (state.hasError) throw state.error!;
+    return state.value;
+  }
+
+  Future<void> loginRequestOtp({required String phoneNumber}) async {
+    await ref.read(authRepositoryProvider).loginRequestOtp(
+          phoneNumber: phoneNumber,
+        );
+  }
+
+  Future<UserModel?> loginVerifyOtp({
+    required String phoneNumber,
+    required String otp,
+  }) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final user = await ref.read(authRepositoryProvider).loginVerifyOtp(
+            phoneNumber: phoneNumber,
+            otp: otp,
+          );
+      return user;
+    });
+    if (state.hasError) throw state.error!;
     return state.value;
   }
 
@@ -55,6 +74,7 @@ class AuthState extends _$AuthState {
           );
       return user;
     });
+    if (state.hasError) throw state.error!;
     return state.value;
   }
 

@@ -90,9 +90,9 @@ flutter run --dart-define=API_BASE_URL=http://localhost:8000/api/v1
      ▼                              ▼
 ```
 
-1. **Request OTP** — `POST /api/v1/auth/request-otp` with `email` or `phone`
-2. **Verify OTP** — `POST /api/v1/auth/verify-otp` with OTP code
-3. **Login** — `POST /api/v1/auth/login` to receive JWT tokens
+1. **Signup** — `POST /api/v1/auth/signup/request-otp` then `POST /api/v1/auth/signup/verify-otp`
+2. **Login (OTP)** — `POST /api/v1/auth/login/request-otp` then `POST /api/v1/auth/login/verify-otp`
+3. **Login (password, legacy)** — `POST /api/v1/auth/login` with phone + password
 
 ## Environment Variables
 

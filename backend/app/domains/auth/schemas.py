@@ -69,8 +69,35 @@ class SignupVerifyOTPRequest(BaseModel):
         return value
 
 
+class LoginRequestOtpRequest(BaseModel):
+    """Step 1: Request WhatsApp OTP for login."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"phone_number": "+919876543210"}]
+        }
+    )
+
+    phone_number: str = Field(..., pattern=r"^\+?[1-9]\d{6,14}$")
+
+
+class LoginVerifyOtpRequest(BaseModel):
+    """Step 2: Verify login OTP and receive JWT tokens."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"phone_number": "+919876543210", "otp": "123456"}
+            ]
+        }
+    )
+
+    phone_number: str = Field(..., pattern=r"^\+?[1-9]\d{6,14}$")
+    otp: str = Field(..., min_length=4, max_length=8, pattern=r"^\d+$", description="6-digit OTP")
+
+
 class LoginRequest(BaseModel):
-    """Login with phone number and password."""
+    """Login with phone number and password (legacy)."""
 
     model_config = ConfigDict(
         json_schema_extra={

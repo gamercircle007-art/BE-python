@@ -5,6 +5,8 @@ from pydantic import ValidationError
 
 from app.domains.auth.schemas import (
     LoginRequest,
+    LoginRequestOtpRequest,
+    LoginVerifyOtpRequest,
     SignupRequestOTPRequest,
     SignupVerifyOTPRequest,
 )
@@ -49,3 +51,13 @@ def test_signup_verify_strong_password() -> None:
 def test_login_valid() -> None:
     req = LoginRequest(phone_number="+919876543210", password="SecurePass1")
     assert req.phone_number == "+919876543210"
+
+
+def test_login_request_otp_valid() -> None:
+    req = LoginRequestOtpRequest(phone_number="+919876543210")
+    assert req.phone_number == "+919876543210"
+
+
+def test_login_verify_otp_valid() -> None:
+    req = LoginVerifyOtpRequest(phone_number="+919876543210", otp="123456")
+    assert req.otp == "123456"

@@ -7,11 +7,14 @@ from app.core.config import Settings
 from app.core.logging import get_logger
 from app.domains.auth.schemas import (
     LoginRequest,
+    LoginRequestOtpRequest,
+    LoginVerifyOtpRequest,
     MessageResponse,
     SignupRequestOTPRequest,
     SignupVerifyOTPRequest,
     TokenResponse,
 )
+from app.domains.auth.services.login_otp_service import LoginOTPService
 from app.domains.auth.services.login_service import LoginService
 from app.domains.auth.services.signup_service import SignupService
 from app.domains.auth.services.token_service import TokenService
@@ -39,6 +42,7 @@ class AuthService:
         self.user_repo = UserRepository(session)
         self.signup_service = SignupService(session, redis_client, settings)
         self.login_service = LoginService(redis_client, settings, self.user_repo)
+        self.login_otp_service = LoginOTPService(redis_client, settings, self.user_repo)
         self.token_service = TokenService(redis_client, settings)
 
     async def signup_request_otp(self, request: SignupRequestOTPRequest) -> MessageResponse:
@@ -57,6 +61,17 @@ class AuthService:
             otp=request.otp,
             password=request.password,
         )
+        tokens = await self.token_service.issue_tokens(user)
+        return TokenResponse(**tokens)
+
+    async def login_request_otp(self, request: LoginRequestOtpRequest) -> MessageResponse:
+        await self.login_otp_service.request_otp(request.phone_number)
+        return MessageResponse(
+            message="If this phone number is registered, an OTP has been sent to WhatsApp.",
+        )
+
+    async def login_verify_otp(self, request: LoginVerifyOtpRequest) -> TokenResponse:
+        user = await self.login_otp_service.verify_otp(request.phone_number, request.otp)
         tokens = await self.token_service.issue_tokens(user)
         return TokenResponse(**tokens)
 

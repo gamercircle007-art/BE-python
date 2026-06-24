@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../shared/widgets/loading_button.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../utils/phone_utils.dart';
 import '../providers/auth_provider.dart';
+import '../providers/login_session_provider.dart';
+import '../widgets/auth_input.dart';
+import '../widgets/gradient_button.dart';
+import '../widgets/gradient_header_widget.dart';
+import '../widgets/social_login_row_widget.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -15,32 +22,37 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _phoneController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _onSendOtp() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final phone = normalizePhone(_phoneController.text);
 
     setState(() => _isLoading = true);
     try {
-      await ref.read(authStateProvider.notifier).login(
-            phoneNumber: _phoneController.text.trim(),
-            password: _passwordController.text,
+      await ref.read(authStateProvider.notifier).loginRequestOtp(
+            phoneNumber: phone,
           );
+
+      ref.read(loginSessionProvider.notifier).setPhone(phone);
+
       if (!mounted) return;
-      context.go('/home');
+      context.push('/auth/login/otp');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: $e')),
+        SnackBar(
+          content: Text('Failed to send OTP: $e'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -50,73 +62,94 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign In')),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Welcome back',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Sign in with your phone number and password',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      backgroundColor: Colors.white,
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const GradientHeaderWidget(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Welcome back !',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textDark,
                       ),
-                ),
-                const SizedBox(height: 32),
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone number',
-                    hintText: '+919876543210',
-                    prefixIcon: Icon(Icons.phone_outlined),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Phone is required';
-                    if (!v.startsWith('+')) return 'Use E.164 format';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
-                  ),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Password is required' : null,
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Login to Paythan with your phone number',
+                      style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 28),
+                    TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.done,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      onFieldSubmitted: (_) => _onSendOtp(),
+                      decoration: authInputDecoration(
+                        hint: 'Phone Number',
+                        icon: Icons.phone_outlined,
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Please enter your phone number';
+                        }
+                        if (v.trim().length < 10) {
+                          return 'Enter a valid phone number';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 28),
+                    GradientButton(
+                      label: 'Send OTP',
+                      isLoading: _isLoading,
+                      onPressed: _isLoading ? null : _onSendOtp,
+                    ),
+                    const SizedBox(height: 20),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => context.push('/auth/signup'),
+                        child: const Text.rich(
+                          TextSpan(
+                            text: 'New user? ',
+                            style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                            children: [
+                              TextSpan(
+                                text: 'Sign Up',
+                                style: TextStyle(
+                                  color: AppColors.primaryBlue,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    const SocialLoginRowWidget(),
+                    const SizedBox(height: 16),
+                    const Center(
+                      child: Text(
+                        'Sign in with another account',
+                        style: TextStyle(color: Color(0xFFAAAAAA), fontSize: 12),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 32),
-                LoadingButton(
-                  label: 'Sign In',
-                  isLoading: _isLoading,
-                  onPressed: _submit,
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () => context.go('/auth/signup'),
-                  child: const Text('New here? Create an account'),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
